@@ -19,7 +19,7 @@ package game_of_life
 
 
 import time "core:time"
-import rl   "vendor:raylib"
+import rl "vendor:raylib"
 
 
 Window :: struct {
@@ -53,7 +53,10 @@ Cell :: struct {
 User_Input :: struct {
 	left_mouse_clicked:   bool,
 	right_mouse_clicked:  bool,
+	increase_tick:        bool,
+	decrease_tick:        bool,
 	toggle_pause:         bool,
+	reset_board:          bool,
 	mouse_world_position: i32,
 	mouse_tile_x:         i32,
 	mouse_tile_y:         i32,
@@ -75,9 +78,12 @@ update_world :: #force_inline proc(world: ^World, next_world: ^World) {
 			index := y * world.width + x
 
 			switch neighbors {
-			case 2: next_world.alive[index] = world.alive[index]
-			case 3: next_world.alive[index] = 1
-			case:   next_world.alive[index] = 0
+			case 2:
+				next_world.alive[index] = world.alive[index]
+			case 3:
+				next_world.alive[index] = 1
+			case:
+				next_world.alive[index] = 0
 			}
 		}
 	}
@@ -88,27 +94,27 @@ update_world :: #force_inline proc(world: ^World, next_world: ^World) {
 */
 count_neighbors :: #force_inline proc(w: ^World, x: i32, y: i32) -> u8 {
 	// our world is a torus!
-	left  := (x - 1) %% w.width
+	left := (x - 1) %% w.width
 	right := (x + 1) %% w.width
-	up    := (y - 1) %% w.height
-	down  := (y + 1) %% w.height
+	up := (y - 1) %% w.height
+	down := (y + 1) %% w.height
 
-	top_left     := w.alive[up   * w.width + left ]
-	top          := w.alive[up   * w.width + x    ]
-	top_right    := w.alive[up   * w.width + right]
+	top_left := w.alive[up * w.width + left]
+	top := w.alive[up * w.width + x]
+	top_right := w.alive[up * w.width + right]
 
-	mid_left     := w.alive[y    * w.width + left ]
-	mid_right    := w.alive[y    * w.width + right]
+	mid_left := w.alive[y * w.width + left]
+	mid_right := w.alive[y * w.width + right]
 
-	bottom_left  := w.alive[down * w.width + left ]
-	bottom       := w.alive[down * w.width + x    ]
+	bottom_left := w.alive[down * w.width + left]
+	bottom := w.alive[down * w.width + x]
 	bottom_right := w.alive[down * w.width + right]
 
-	top_row    := top_left    + top     + top_right
-	mid_row    := mid_left              + mid_right
-	bottom_row := bottom_left + bottom  + bottom_right
+	top_row := top_left + top + top_right
+	mid_row := mid_left + mid_right
+	bottom_row := bottom_left + bottom + bottom_right
 
-	total      := top_row     + mid_row + bottom_row
+	total := top_row + mid_row + bottom_row
 	return total
 }
 
@@ -152,7 +158,7 @@ draw_cursor :: proc(user_input: User_Input, cell: Cell) {
  to know anything about what the user input was. (You could process a controller here)
 **/
 process_user_input :: proc(user_input: ^User_Input, window: Window, world: World) {
-	m_pos   := rl.GetMousePosition()
+	m_pos := rl.GetMousePosition()
 	mouse_x := i32((m_pos[0] / f32(window.width)) * f32(world.width))
 	mouse_y := i32((m_pos[1] / f32(window.height)) * f32(world.height))
 
@@ -165,7 +171,10 @@ process_user_input :: proc(user_input: ^User_Input, window: Window, world: World
 	user_input^ = User_Input {
 		left_mouse_clicked   = rl.IsMouseButtonDown(.LEFT),
 		right_mouse_clicked  = rl.IsMouseButtonDown(.RIGHT),
+		increase_tick        = rl.IsKeyPressed(.RIGHT),
+		decrease_tick        = rl.IsKeyPressed(.LEFT),
 		toggle_pause         = rl.IsKeyPressed(.SPACE),
+		reset_board			 = rl.IsKeyPressed(.R),
 		mouse_world_position = i32(mouse_y * world.width + mouse_x),
 		mouse_tile_x         = mouse_x,
 		mouse_tile_y         = mouse_y,
@@ -184,7 +193,7 @@ main :: proc() {
 		height    = 64,
 	}
 
-	world      := World{game.width, game.height, make([]u8, game.width * game.height)}
+	world := World{game.width, game.height, make([]u8, game.width * game.height)}
 	next_world := World{game.width, game.height, make([]u8, game.width * game.height)}
 	defer delete(world.alive)
 	defer delete(next_world.alive)
@@ -225,6 +234,20 @@ main :: proc() {
 		}
 		if user_input.toggle_pause {
 			game.pause = !game.pause
+		}
+		if user_input.increase_tick {
+			game.tick_rate /= 2
+		}
+		if user_input.decrease_tick {
+			game.tick_rate *= 2
+		}
+		if user_input.reset_board{
+			for x in 0..<world.width {
+				for y in 0..<world.height {
+					world.alive[y*world.height + x] = 0
+				}
+			}
+			game.pause = false
 		}
 
 		// Step 2: Update the world state
